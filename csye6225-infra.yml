@@ -1,0 +1,907 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: A sample template for CSYE6225 assignment
+Parameters:
+  VpcCidrBlock:
+    Description: "Cidr block for VPC"
+    Type: String
+    Default: "10.0.0.0/16"
+  SubCidrBlockA:
+    Description: "Cidr block for subnet a"
+    Type: String
+    Default: "10.0.0.0/24"
+  SubCidrBlockB:
+    Description: "Cidr block for subnet b"
+    Type: String
+    Default: "10.0.1.0/24"
+  SubCidrBlockC:
+    Description: "Cidr block for subnet c"
+    Type: String
+    Default: "10.0.2.0/24"
+  PrivateSubCidrBlockA:
+    Description: "Cidr block for private subnet a"
+    Type: String
+    Default: "10.0.3.0/24"
+  PrivateSubCidrBlockB:
+    Description: "Cidr block for private subnet b"
+    Type: String
+    Default: "10.0.4.0/24"
+  PrivateSubCidrBlockC:
+    Description: "Cidr block for private subnet c"
+    Type: String
+    Default: "10.0.5.0/24"
+  DestinationCIDRblock:
+    Description: "Cidr block for destination in route table"
+    Type: String
+    Default: "0.0.0.0/0"
+  AMIid:
+    Description: "Amazon Machine Image Id"
+    Type: String
+    Default: "ami-0e7b9ed062568829c"
+  CurrentProfile:
+    Type: String
+    Default: "demo"
+  ProdProfile:
+    Type: String
+    Default: "demo"
+  DbUserName:
+    Type: String
+    Default: "ubuntu"
+  DbUserPassword:
+    Type: String
+    Default: "test1234"
+  CertificateARN:
+    Description: Demo Domain SSL Certificate ARN
+    Type: String
+    Default: "arn:aws:acm:us-west-2:307355757102:certificate/7e5343e9-f676-4cd5-88e0-94e76083444e"
+
+
+Conditions:
+  UseProdCondition: !Equals [ !Ref CurrentProfile, !Ref ProdProfile ]
+
+Resources:
+
+  #================================ VPC resources ================================
+
+  myVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidrBlock
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: myVPC
+      AvailabilityZone: "us-west-2a"
+      CidrBlock: !Ref SubCidrBlockA
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub PublicSubA-${AWS::StackName}
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: myVPC
+      AvailabilityZone: "us-west-2b"
+      CidrBlock: !Ref SubCidrBlockB
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub PublicSubB-${AWS::StackName}
+  PublicSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref myVPC
+      AvailabilityZone: "us-west-2c"
+      CidrBlock: !Ref SubCidrBlockC
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub PublicSubC-${AWS::StackName}
+
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: myVPC
+      AvailabilityZone: "us-west-2a"
+      CidrBlock: !Ref PrivateSubCidrBlockA
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub PrivateSubA-${AWS::StackName}
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: myVPC
+      AvailabilityZone: "us-west-2b"
+      CidrBlock: !Ref PrivateSubCidrBlockB
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub PrivateSubB-${AWS::StackName}
+  PrivateSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref myVPC
+      AvailabilityZone: "us-west-2c"
+      CidrBlock: !Ref PrivateSubCidrBlockC
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub PrivateSubC-${AWS::StackName}
+
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+  AttachGateway:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref myVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref myVPC
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+  PublicRoute:
+    Type: 'AWS::EC2::Route'
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: !Ref DestinationCIDRblock
+      GatewayId: !Ref InternetGateway
+
+  PrivateRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref myVPC
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+
+
+  PublicSubnetRouteTableAssociationA:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetRouteTableAssociationB:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetRouteTableAssociationC:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PublicSubnetC
+      RouteTableId: !Ref PublicRouteTable
+
+  PrivateSubnetRouteTableAssociationA:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTable
+  PrivateSubnetRouteTableAssociationB:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivateSubnetB
+      RouteTableId: !Ref PrivateRouteTable
+  PrivateSubnetRouteTableAssociationAC:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivateSubnetC
+      RouteTableId: !Ref PrivateRouteTable
+
+
+  #================================ Security resources ================================
+
+  WebAppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "application Security Group"
+      VpcId: !Ref myVPC
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        FromPort: 0
+        ToPort: 0
+        CidrIp: 0.0.0.0/0
+      SecurityGroupIngress:
+      - IpProtocol: -1
+        FromPort: 0
+        ToPort: 0
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        SourceSecurityGroupId: !Ref loadBalancerSecurityGroup
+      - IpProtocol: tcp
+        FromPort: 1649
+        ToPort: 1649
+        SourceSecurityGroupId: !Ref loadBalancerSecurityGroup
+
+
+  databaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "database Security Group"
+      VpcId: !Ref myVPC
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        FromPort: 0
+        ToPort: 0
+        CidrIp: 0.0.0.0/0
+      SecurityGroupIngress:
+      - IpProtocol: -1
+        FromPort: 0
+        ToPort: 0
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 3306
+        ToPort: 3306
+        SourceSecurityGroupId: !Ref WebAppSecurityGroup
+
+
+  loadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "load balancer Security Group"
+      VpcId: !Ref myVPC
+      SecurityGroupEgress:
+      - IpProtocol: -1
+        FromPort: 0
+        ToPort: 0
+        CidrIp: 0.0.0.0/0
+      SecurityGroupIngress:
+      - IpProtocol: -1
+        FromPort: 0
+        ToPort: 0
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443
+        CidrIp: 0.0.0.0/0
+
+
+
+#================================ Auto Scaling resources ================================
+  asgLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+#      LaunchTemplateName: !Sub '${AWS::StackName}-asg_launch_config'
+      LaunchTemplateName: 'asg_launch_config'
+      LaunchTemplateData:
+        BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: "20"
+            VolumeType: "gp3"
+            Encrypted: true
+            KmsKeyId: !GetAtt EBSKey.Arn
+            DeleteOnTermination: "true"
+        ImageId: !Ref AMIid
+        InstanceType: t2.micro
+        SecurityGroupIds:
+          - !GetAtt WebAppSecurityGroup.GroupId
+        IamInstanceProfile:
+          Name: !Ref InstanceProfile
+        UserData:
+          # log at: /var/log/cloud-init-output.log
+          Fn::Base64:
+            !Sub |
+            #!/bin/bash
+            set -e
+            set -x
+            apt-get upgrade -y
+            
+            # create credentials
+            WEBAPP_ROOT=/home/ubuntu/webapp
+            cd $WEBAPP_ROOT
+            mkdir webappConfig
+            cd $WEBAPP_ROOT/webappConfig
+            echo "${myBucket}" > bucket_name.txt
+            echo "${myRDSInstance.Endpoint.Address}" > mysql_host.txt
+            echo "${DbUserName}" > mysql_username.txt
+            echo "${DbUserPassword}" > mysql_password.txt
+            
+            # set up database
+            cd $WEBAPP_ROOT
+            wget https://truststore.pki.rds.amazonaws.com/us-west-2/us-west-2-bundle.pem
+            sudo python3 src/db.py
+            
+            # add webapp to systemd
+            apt-get install -y systemd
+            cp ./webapp.service /etc/systemd/system
+            chmod 644 /etc/systemd/system/webapp.service
+            systemctl daemon-reload
+            systemctl enable webapp.service
+            systemctl start webapp.service
+            
+            # set up CloudWatch .
+            sudo cp cloudwatch_config/cloudwatch_config.json /opt/cloudwatch-config.json
+            sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/cloudwatch-config.json -s
+
+
+  EBSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: This Customer managed key is used for encrypted EBS volume.
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: "EBS-key"
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Join
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':root'
+            Action:
+              - "kms:*"
+            Resource: '*'
+          - Sid: "Allow access for Key Administrators"
+            Effect: Allow
+            Principal:
+              AWS: !Join
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':user/miffydemo'
+            Action:
+              - kms:Describe*
+              - kms:Put*
+              - kms:Create*
+              - kms:Update*
+              - kms:Enable*
+              - kms:Revoke*
+              - kms:List*
+              - kms:Disable*
+              - kms:Get*
+              - kms:Delete*
+              - kms:ScheduleKeyDeletion
+              - kms:CancelKeyDeletion
+            Resource: "*"
+          - Sid: "Allow use of the key"
+            Effect: Allow
+            Principal:
+              AWS: !Join
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling'
+            Action:
+              - kms:Encrypt
+              - kms:Decrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+            Resource: '*'
+          - Sid: "Allow attachment of persistent resources"
+            Effect: Allow
+            Principal:
+              AWS: !Join
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling'
+            Action:
+              - kms:CreateGrant
+              - kms:ListGrants
+              - kms:RevokeGrant
+            Resource: '*'
+            Condition:
+              Bool:
+                kms:GrantIsForAWSResource: true
+
+  EBSKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/ebsKey
+      TargetKeyId: !Ref EBSKey
+
+  asgWebApp:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub ${AWS::StackName}-asg
+      AvailabilityZones:
+        - us-west-2a
+        - us-west-2b
+        - us-west-2c
+      Cooldown: '60'
+      DesiredCapacity: '1'
+      HealthCheckGracePeriod: 90
+      HealthCheckType: EC2
+      LaunchTemplate:
+        LaunchTemplateId: !Ref asgLaunchTemplate
+        Version: !GetAtt asgLaunchTemplate.LatestVersionNumber
+      MaxSize: '3'
+      MinSize: '1'
+      NewInstancesProtectedFromScaleIn: false
+      Tags:
+        - Key: Application
+          Value: WebApp
+          PropagateAtLaunch: "true"
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-asg
+          PropagateAtLaunch: "true"
+      TargetGroupARNs:
+        - !Ref loadBalancerTargetGroup
+      VPCZoneIdentifier:
+        - !Ref PublicSubnetA
+        - !Ref PublicSubnetB
+        - !Ref PublicSubnetC
+
+  asgScaleUpPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref asgWebApp
+      AdjustmentType: ChangeInCapacity
+      Cooldown: 60
+      PolicyType: SimpleScaling
+      ScalingAdjustment: 1
+
+  asgScaleDownPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref asgWebApp
+      AdjustmentType: ChangeInCapacity
+      Cooldown: 60
+      PolicyType: SimpleScaling
+      ScalingAdjustment: -1
+
+  CPUAlarmHigh:
+     Type: AWS::CloudWatch::Alarm
+     Properties:
+        AlarmDescription: "Scale-up if CPU > 5% for 60 seconds"
+        MetricName: CPUUtilization
+        Namespace: AWS/EC2
+        Statistic: Average
+        Period: 60
+        EvaluationPeriods: 2
+        Threshold: 5.0
+        AlarmActions:
+          - !Ref asgScaleUpPolicy
+        Dimensions:
+          - Name: AutoScalingGroupName
+            Value: !Ref asgWebApp
+        ComparisonOperator: GreaterThanThreshold
+
+  CPUAlarmLow:
+     Type: AWS::CloudWatch::Alarm
+     Properties:
+        AlarmDescription: "Scale-up if CPU < 3% for 60 seconds"
+        MetricName: CPUUtilization
+        Namespace: AWS/EC2
+        Statistic: Average
+        Period: 60
+        EvaluationPeriods: 2
+        Threshold: 3.0
+        AlarmActions:
+          - !Ref asgScaleDownPolicy
+        Dimensions:
+          - Name: AutoScalingGroupName
+            Value: !Ref asgWebApp
+        ComparisonOperator: LessThanThreshold
+
+  loadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      LoadBalancerAttributes:
+        - Key: idle_timeout.timeout_seconds
+          Value: '60'
+      Name: !Sub ${AWS::StackName}-load-balancer
+      Scheme: internet-facing
+      SecurityGroups:
+        - !Ref loadBalancerSecurityGroup
+      Subnets:
+        - !Ref PublicSubnetA
+        - !Ref PublicSubnetB
+        - !Ref PublicSubnetC
+      Tags:
+        - Key: Application
+          Value: WebApp
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-load-balancer
+      Type: application
+
+  loadBalancerTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 90
+      HealthCheckPath: '/healthz'
+      HealthCheckPort: '1649'
+      HealthCheckProtocol: 'HTTP'
+      HealthCheckTimeoutSeconds: 60
+      HealthyThresholdCount: 2
+      IpAddressType: ipv4
+      Name: !Sub ${AWS::StackName}-lb-tg
+      Port: 1649
+      Protocol: 'HTTP'
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-lb-tg
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '20'
+      TargetType: instance
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref myVPC
+
+  loadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref loadBalancerTargetGroup
+      LoadBalancerArn: !Ref loadBalancer
+      Certificates:
+        - CertificateArn: !Ref CertificateARN
+      Port: 443
+      Protocol: HTTPS
+
+
+  #================================ DNS and Bucket resources ================================
+
+  myDNS:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneId: Z0396250A000E33L4V61
+      Comment: Zone apex alias targeted to LoadBalancer.
+      RecordSets:
+        - Name: prod.miffy.space
+          Type: A
+          AliasTarget:
+            HostedZoneId: !GetAtt 'loadBalancer.CanonicalHostedZoneID'
+            DNSName: !GetAtt 'loadBalancer.DNSName'
+
+  myBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: Private
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      BucketName:
+        !If [ UseProdCondition,
+              !Join [ '.', [ !Select [ 2, !Split [ '/', !Ref AWS::StackId ] ], "xinyi-wu-prod" ] ],
+              !Join [ '.', [ !Select [ 2, !Split [ '/', !Ref AWS::StackId ] ], "xinyi-wu-dev" ] ] ]
+      LifecycleConfiguration:
+        Rules:
+          - Id: STANDARD_IA_Rule
+            Status: Enabled
+            ExpirationInDays: 31
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: STANDARD_IA
+
+
+
+  #================================ IAM resources ================================
+  ## Create IAM Role EC2-CSYE6225 with webAppS3Policy
+  EC2CSYE6225Role:
+    Type: AWS::IAM::Role
+    Properties:
+      # RoleName: "EC2-CSYE6225"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: webAppS3Policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  - !Sub arn:aws:s3:::${myBucket}
+                  - !Sub arn:aws:s3:::${myBucket}/*
+        - PolicyName: WebAppServerless
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Resource: "*"
+                Action:
+                  - 'sns:List*'
+                  - 'sns:Get*'
+                  - 'sns:Pub*'
+                  - "dynamodb:Get*"
+                  - "dynamodb:Put*"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
+
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: ec2-instance-profile
+      Path: /
+      Roles:
+       - !Ref EC2CSYE6225Role
+
+  #================================ DataBase resources ================================
+
+  myRDSInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBName: "csye6225"
+      Engine: "mysql"
+      EngineVersion: "5.7.33"
+      DBInstanceClass: "db.t3.micro"
+      AllocatedStorage: "20"
+      DBInstanceIdentifier: "csye6225"
+      MasterUsername: !Ref DbUserName
+      MasterUserPassword: !Ref DbUserPassword
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      DBParameterGroupName: !Ref DBParameterGroup
+      VPCSecurityGroups: [ !Ref databaseSecurityGroup ]
+      PubliclyAccessible: false
+      MultiAZ: false
+      StorageEncrypted: true
+      KmsKeyId:
+        Fn::GetAtt: [ RdsInstanceKey, Arn ]
+
+  RdsInstanceKey:
+    Type: 'AWS::KMS::Key'
+    Properties:
+      Description: A symmetric KMS key for RDS instance
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: "RDS-key"
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Join
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':root'
+            Action:
+              - "kms:*"
+            Resource: '*'
+          - Sid: "Add service role"
+            Effect: Allow
+            Principal:
+              AWS: !Join
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':role/aws-service-role/rds.amazonaws.com/AWSServiceRoleForRDS'
+            Action:
+              - "kms:*"
+            Resource: "*"
+
+  RDSKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/rdsKey
+      TargetKeyId: !Ref RdsInstanceKey
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "Subnet group"
+      DBSubnetGroupName: "mySubnetGroup"
+      SubnetIds:
+        [ !Ref PrivateSubnetA, !Ref PrivateSubnetB ]
+
+  DBParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: CloudFormation MySQL Parameter Group
+      Family: mysql5.7
+      Parameters:
+        sql_mode: IGNORE_SPACE
+        max_allowed_packet: 67108864
+
+  myDynamoDB:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        -
+          AttributeName: "UserName"
+          AttributeType: "S"
+      KeySchema:
+        -
+          AttributeName: "UserName"
+          KeyType: "HASH"
+      BillingMode: PAY_PER_REQUEST
+      TableName: csye6225-token
+      TimeToLiveSpecification:
+        AttributeName: "ExpireTime"
+        Enabled: true
+
+  #================================ Serverless resources ================================
+
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: sns-topic-for-lambda
+      TopicName: sns-topic-for-lambda
+      Subscription:
+        - Endpoint: !GetAtt LambdaFunction.Arn
+          Protocol: lambda
+
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref SNSTopic
+      FunctionName: !Ref LambdaFunction
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                # - ec2.amazonaws.com
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaDynamoDBExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+#        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+#        - arn:aws:iam::aws:policy/AmazonSESFullAccess
+      RoleName: LambdaExecutionRole
+
+  LambdaExecutionPloicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Action:
+              - "ses:SendEmail"
+              - "ses:SendRawEmail"
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:PutLogEvents"
+              - "dynamodb:Get*"
+              - "dynamodb:Put*"
+              - "lambda:Update*"
+            Resource: "*"
+      PolicyName: "Lambda-Execution-Policy"
+      Roles:
+        - !Ref LambdaExecutionRole
+
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: MyEmailSenderFunction
+      Handler: index.lambda_handler
+      Role:
+        Fn::GetAtt: [ LambdaExecutionRole, Arn ]
+      Code:
+        ZipFile: |
+          import json
+          import textwrap
+          
+          import boto3
+          from botocore.exceptions import ClientError
+          
+          
+          def lambda_handler(event=None, context=None):
+              aws_region = "us-west-2"
+          
+              subject = "Please verify your email address"
+              sender = "noReply@prod.miffy.space"
+          
+              if event is not None:
+                  message = event['Records'][0]['Sns']['Message']
+                  print(message)
+                  message = json.loads(message)
+                  print(message)
+                  recipient = message["email"]
+                  token = message["token"]
+              else:
+                  recipient = "xinyiwu2200@gmail.com"
+                  from uuid import uuid4
+                  token = uuid4()
+          
+              table = boto3.resource('dynamodb', region_name=aws_region).Table('csye6225-token')
+              response = table.get_item(Key={"UserName": recipient})
+              if "Item" in response.keys():
+                  item = response['Item']
+                  if item["sendStatus"] == "sent":
+                      return
+              else:
+                  return
+          
+              destination = {
+                  'ToAddresses': [
+                      recipient,
+                  ]
+              }
+          
+              link = "https://prod.miffy.space/v1/verifyUserEmail?email=%s&token=%s" % (recipient, token)
+              body_text = textwrap.dedent(
+                  f"""
+                  You are creating your account in our web.
+                  Please click the link below to complete validation, this link will be expired in 5 minutes.
+                  {link}
+                  """
+              )
+          
+              print(body_text)
+              charset = "UTF-8"
+          
+              # Create a new SES resource and specify a region.
+              client = boto3.client('ses', region_name=aws_region)
+          
+              try:
+                  response = client.send_email(
+                      Destination=destination,
+                      Message={
+                          'Body': {
+                              'Text': {
+                                  'Charset': charset,
+                                  'Data': body_text,
+                              },
+                          },
+                          'Subject': {
+                              'Charset': charset,
+                              'Data': subject,
+                          },
+                      },
+                      Source=sender
+                  )
+          
+                  item["sendStatus"] = "sent"
+                  table.put_item(Item=item)
+          
+          
+              # Display an error if something goes wrong.
+              except ClientError as e:
+                  print(e.response['Error']['Message'])
+              else:
+                  print("Email sent! Message ID:")
+                  print(response['MessageId'])
+                  print(recipient)
+      PackageType: Zip
+      Runtime: python3.8
+      Timeout: 10
+      TracingConfig:
+        Mode: Active
